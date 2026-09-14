@@ -14,9 +14,12 @@
   图表类取值（Smith 负荷系数图）用查表近似，与手算查图有 1到5% 量级差异。
 - 平均相对挥发度 alpha 按「每块理论板的相对挥发度取几何平均」计算（与教材一致）。
 """
-import csv, math, os, argparse, sys
+import csv, math, os, argparse, sys, io, json, contextlib
 
 CONFIG = {"xuehao": "01", "banhao": "445"}   # 学号后两位 / 班号后三位
+
+# main() 结束时写入的关键指标，供 --advise 增量核算读取
+METRICS = {}
 
 MA, MB = 46.0, 18.0          # 乙醇 / 水 摩尔质量 kg/kmol
 P0 = 101.3                    # 操作压力 kPa
@@ -55,6 +58,8 @@ PARAMS = {
     "hole_every": 6,   # 每几块板设一个人孔
     "hole_h": 0.6,     # 人孔处板间距加高 m（人孔 Φ600）
 }
+
+DEFAULT_PARAMS = dict(PARAMS)   # 出厂默认值快照，供增量核算做对比基准
 
 # 标准无缝钢管规格 (外径 mm, 壁厚 mm)，GB/T 8163
 PIPES = [(18, 3), (25, 3), (32, 3), (38, 3), (45, 3), (57, 3.5), (76, 4),
@@ -470,7 +475,7 @@ def suggest_fix(tray, results, hyd, p, names, Ne_rect, Ne_strip):
     return tips
 
 # ---------------- 主计算 ----------------
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--xuehao", default=None, help="学号后两位")
     ap.add_argument("--banhao", default=None, help="班号后三位（给学号时可省略，自动按学号第4到6位拆）")
@@ -479,9 +484,13 @@ def main():
                     help="覆盖自选参数，如 --set HT=0.45 HT2=0.6 t=15 u_uF=0.7")
     ap.add_argument("--show-params", action="store_true",
                     help="只列出全部可调参数及当前值，然后退出")
-    args = ap.parse_args()
+    ap.add_argument("--advise", action="store_true",
+                    help="增量核算：输出当前选择的影响，以及后续各参数的可行范围")
+    ap.add_argument("--json", action="store_true", help="只输出指标 JSON（内部使用）")
+    args = ap.parse_args(argv)
 
     # 自选参数覆盖（使用者逐组选定后由此传入）
+    overrides = {}
     if args.set:
         for kv in args.set:
             if "=" not in kv:
@@ -493,6 +502,7 @@ def main():
                 sys.exit(1)
             try:
                 PARAMS[k] = type(PARAMS[k])(v)
+                overrides[k] = PARAMS[k]
             except ValueError:
                 print(f"[错误] 参数 {k} 无法解析为 {type(PARAMS[k]).__name__}：{v}")
                 sys.exit(1)
@@ -509,6 +519,11 @@ def main():
     # 既给学号又给班号时用用户给的班号；都没给用默认值
     xh = args.xuehao if args.xuehao is not None else CONFIG["xuehao"]
     bh = args.banhao if args.banhao is not None else CONFIG["banhao"]
+
+    # 增量核算模式：不进主流程，由 do_advise 自己反复试算
+    if args.advise:
+        do_advise(xh, bh, overrides)
+        return
 
     base = os.path.dirname(os.path.abspath(__file__))
     vle_path = os.path.join(base, "ethanol-water-vle.csv")
@@ -791,5 +806,150 @@ def main():
     print("\n(注：3.3.8 平均密度、3.3.9 平均表面张力已含在 2.7 物性中；全凝器见 2.12；)")
     print(" 原料预热器、进料泵、回流泵需按负荷与扬程另行选型。)")
 
+    # ---- 供 --advise 增量核算读取的指标快照 ----
+    METRICS.clear()
+    METRICS.update(
+        xF=xF, xD=xD, xW=xW, F=F, D=D, W=W, S=S, R=R, Rmin=Rmin,
+        N_trays=N_trays, n_rect=n_rect, n_strip=n_strip,
+        Ne=Ne, Ne_rect=Ne_rect, Ne_strip=Ne_strip,
+        d_rect=d_rect, d_strip=d_strip, Dcol_rect=results['精馏段']['Dcol'],
+        Htot=Htot, H_tray=H_tray, H_hole=H_hole, n_hole=n_hole,
+        dP=dP, QT=QT, A_cond=A_cond, mS_cool=mS_cool,
+        K_rect=hyd['精馏段']['K'], K_strip=hyd['提馏段']['K'],
+        eV_rect=hyd['精馏段']['eV'], eV_strip=hyd['提馏段']['eV'],
+        tau_rect=hyd['精馏段']['tau'], tau_strip=hyd['提馏段']['tau'],
+        dHt_rect=hyd['精馏段']['dHt'], dHt_strip=hyd['提馏段']['dHt'],
+        how=hyd['精馏段']['how'], hw=hyd['精馏段']['hw'],
+        lw=tray['lw'], Wd=tray['Wd'], Ad=tray['Ad'], A0=tray['A0'],
+        n_holes=tray['n'], phi=tray['phi'], Aa=tray['Aa'],
+        u0_rect=hyd['精馏段']['u0'], u0_strip=hyd['提馏段']['u0'],
+        bad=list(bad), params=dict(PARAMS),
+    )
+
+
+# ---------------- 增量核算（--advise）----------------
+
+# 可扫描的参数及其取值序列（用于反算“使整体合格”的范围）
+SCAN_SPEC = [
+    ("HT",        "精馏段板间距", "m",  [round(0.25 + 0.05 * i, 2) for i in range(13)]),
+    ("HT2",       "提馏段板间距", "m",  [round(0.30 + 0.05 * i, 2) for i in range(13)]),
+    ("lw_ratio",  "堰长比 lw/D",  "",   [round(0.50 + 0.05 * i, 2) for i in range(8)]),
+    ("hL",        "板上清液层",   "mm", [float(v) for v in range(40, 85, 5)]),
+    ("hH",        "降液管底隙",   "mm", [float(v) for v in range(20, 44, 2)]),
+    ("d0",        "筛孔孔径",     "mm", [4.0, 5.0, 6.0, 8.0]),
+    ("t",         "孔距",         "mm", [float(v) for v in range(12, 31)]),
+    ("u_uF",      "空塔气速系数", "",   [round(0.55 + 0.05 * i, 2) for i in range(6)]),
+    ("Wc",        "边缘区",       "mm", [25.0, 40.0, 50.0, 60.0, 75.0]),
+    ("Ws",        "安定区",       "mm", [50.0, 60.0, 75.0, 100.0]),
+    ("tp",        "板厚",         "mm", [3.0, 4.0]),
+]
+
+
+def query_metrics(xh, bh, overrides, reset=False):
+    """进程内静默跑一次完整计算，返回指标字典（不打印报告）。
+
+    reset=True 时先恢复出厂默认参数，再叠加 overrides —— 对比基准必须用这个模式，
+    否则会拿到“已叠加使用者选择”的结果，对比全部显示为「不变」。
+    """
+    saved = dict(PARAMS)
+    if reset:
+        PARAMS.clear()
+        PARAMS.update(DEFAULT_PARAMS)
+    PARAMS.update(overrides)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            main(["--xuehao", str(xh), "--banhao", str(bh)])
+        return dict(METRICS)
+    finally:
+        PARAMS.clear()
+        PARAMS.update(saved)
+
+
+def do_advise(xh, bh, overrides):
+    """打印：当前选择的后果 + 后续参数的合理取值范围。"""
+    base = query_metrics(xh, bh, {}, reset=True)
+    cur = query_metrics(xh, bh, overrides, reset=True)
+    if not cur:
+        print("核算失败，请检查参数。")
+        return
+
+    print("=" * 66)
+    print("增量核算：当前选择的影响 + 后续参数建议")
+    print("=" * 66)
+    if overrides:
+        print("已改参数：" + "  ".join(f"{k}={v}" for k, v in overrides.items()))
+    else:
+        print("已改参数：（无，全部用推荐值）")
+    print()
+
+    def line(name, a, b, unit="", fmt="{:.2f}", note_hi_good=False):
+        if a is None or b is None:
+            return
+        d = b - a
+        if abs(d) < 1e-9:
+            print(f"  {name:12s} {fmt.format(a)}{unit}   （不变）")
+        else:
+            pct = d / a * 100 if abs(a) > 1e-9 else 0.0
+            arrow = "↑" if d > 0 else "↓"
+            print(f"  {name:12s} {fmt.format(a)}{unit} → {fmt.format(b)}{unit}"
+                  f"   （{arrow}{fmt.format(abs(d))}{unit}, {pct:+.1f}%）")
+
+    print("【对整体设计的影响】")
+    line("全塔高", base["Htot"], cur["Htot"], " m")
+    line("塔板段高", base["H_tray"], cur["H_tray"], " m")
+    line("精馏段塔径", base["Dcol_rect"], cur["Dcol_rect"], " m", "{:.3f}")
+    line("圆整塔径", base["d_rect"], cur["d_rect"], " m", "{:.1f}")
+    line("实际板数", base["Ne"], cur["Ne"], " 块", "{:.0f}")
+    line("全塔压降", base["dP"], cur["dP"], " kPa")
+    line("单板压降(精)", base["dHt_rect"] * 1000, cur["dHt_rect"] * 1000, " mm液柱", "{:.1f}")
+    line("稳定系数(精)", base["K_rect"], cur["K_rect"], "", "{:.2f}")
+    line("稳定系数(提)", base["K_strip"], cur["K_strip"], "", "{:.2f}")
+    line("液沫夹带(精)", base["eV_rect"], cur["eV_rect"], "", "{:.4f}")
+    line("停留时间(精)", base["tau_rect"], cur["tau_rect"], " s")
+    line("堰上液头", base["how"] * 1000, cur["how"] * 1000, " mm", "{:.1f}")
+    line("孔数", base["n_holes"], cur["n_holes"], " 个", "{:.0f}")
+    line("开孔率", base["phi"], cur["phi"], "", "{:.4f}")
+    line("全凝器面积", base["A_cond"], cur["A_cond"], " m²", "{:.1f}")
+    if cur["bad"]:
+        print(f"  ⚠ 校核结论：**不合格** -> {'；'.join(cur['bad'])}")
+    else:
+        print("  ✓ 校核结论：全部合格")
+    print()
+
+    print("【后续参数建议（基于当前已选参数推算）】")
+    print("  下表“可行范围”指：其余参数保持现值时，该参数取范围内任一点都能通过全部校核。")
+    print()
+    for key, label, unit, values in SCAN_SPEC:
+        cur_v = cur["params"][key]
+        ok_vals = []
+        for v in values:
+            ov = dict(overrides)
+            ov[key] = v
+            m = query_metrics(xh, bh, ov, reset=True)
+            if m and not m["bad"]:
+                ok_vals.append(v)
+        if ok_vals:
+            lo, hi = min(ok_vals), max(ok_vals)
+            mark = "✓" if (lo - 1e-9) <= cur_v <= (hi + 1e-9) else "⚠ 现值超出可行范围"
+            rng = f"{lo:g} ~ {hi:g}" if abs(hi - lo) > 1e-9 else f"仅 {lo:g}"
+            print(f"  {key:10s} {label:12s} 现值 {cur_v:g} {unit:4s}  可行 {rng} {unit}   {mark}")
+        else:
+            print(f"  {key:10s} {label:12s} 现值 {cur_v:g} {unit:4s}  可行范围：需同时调整其他参数")
+    print()
+    if cur["bad"]:
+        print("⚠ 当前组合**不合格**：请使用者先调整上表中标「⚠ 现值超出可行范围」的参数"
+              "（优先调本次刚定的那个），把它们带回可行范围内，再继续问下一组。")
+        print("  上表里没标 ⚠ 的参数保持现值即可，不用动。")
+    else:
+        print("提示：把上面「可行范围」作为下一组参数的推荐区间告诉使用者；")
+        if overrides:
+            print("      并结合【对整体设计的影响】说明本次选择牵动了哪些指标、为什么。")
+
+
 if __name__ == "__main__":
-    main()
+    if "--json" in sys.argv:                 # 静默跑一次，只吐指标
+        with contextlib.redirect_stdout(io.StringIO()):
+            main()
+        sys.stdout.write(json.dumps(METRICS, ensure_ascii=False))
+    else:
+        main()
