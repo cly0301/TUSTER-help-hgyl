@@ -39,10 +39,15 @@ PARAMS = {
     "beta": 0.6,       # 液层阻力修正系数
     "phi_foam": 0.6,   # 泡沫密度系数（降液管液面校核用）
     "Fw": 1.02,        # 堰上液头校正系数
+    "u_uF": 0.8,       # 空塔气速系数 u/uF（0.5~0.8）
     # ---- 接管流速 m/s ----
     "u_liq": 0.5,      # 进料管 / 釜液排出管
     "u_liq_ret": 0.3,  # 回流管
     "u_gas": 15.0,     # 塔顶蒸汽 / 塔底进气
+    # ---- 附属设备 ----
+    "K_cond": 915.0,   # 全凝器总传热系数 W/(m2·K)
+    "t_cool_in": 30.0,   # 冷却水进口 ℃
+    "t_cool_out": 45.0,  # 冷却水出口 ℃（≤50）
     # ---- 塔高 ----
     "HD": 1.0,         # 塔顶空间 m
     "HB": 1.0,         # 塔底空间 m
@@ -470,7 +475,32 @@ def main():
     ap.add_argument("--xuehao", default=None, help="学号后两位")
     ap.add_argument("--banhao", default=None, help="班号后三位（给学号时可省略，自动按学号第4到6位拆）")
     ap.add_argument("--id", default=None, help="完整8位学号(如 23044401)")
+    ap.add_argument("--set", nargs="*", default=None, metavar="KEY=VAL",
+                    help="覆盖自选参数，如 --set HT=0.45 HT2=0.6 t=15 u_uF=0.7")
+    ap.add_argument("--show-params", action="store_true",
+                    help="只列出全部可调参数及当前值，然后退出")
     args = ap.parse_args()
+
+    # 自选参数覆盖（使用者逐组选定后由此传入）
+    if args.set:
+        for kv in args.set:
+            if "=" not in kv:
+                print(f"[错误] 参数格式应为 KEY=VAL，收到：{kv}")
+                sys.exit(1)
+            k, v = kv.split("=", 1)
+            if k not in PARAMS:
+                print(f"[错误] 未知参数 {k}。可用参数：\n  {', '.join(sorted(PARAMS))}")
+                sys.exit(1)
+            try:
+                PARAMS[k] = type(PARAMS[k])(v)
+            except ValueError:
+                print(f"[错误] 参数 {k} 无法解析为 {type(PARAMS[k]).__name__}：{v}")
+                sys.exit(1)
+    if args.show_params:
+        print("可调自选参数（当前值）：")
+        for k in sorted(PARAMS):
+            print(f"  {k:12s} = {PARAMS[k]}")
+        sys.exit(0)
     if args.id:
         s = str(args.id).zfill(8)
         args.xuehao = s[6:8]                 # 学号后两位 = 末两位
@@ -503,6 +533,10 @@ def main():
     print(f"进料 aF = {aF*100:.2f}%  xF = {xF:.4f}")
     print(f"塔顶 aD = {aD*100:.2f}%  xD = {xD:.4f}")
     print(f"塔釜 aW = {aW*100:.2f}%  xW = {xW:.5f}")
+    print(f"自选参数：HT={PARAMS['HT']*1000:.0f}/{PARAMS['HT2']*1000:.0f} mm  "
+          f"lw/D={PARAMS['lw_ratio']}  hL={PARAMS['hL']:.0f} mm  hH={PARAMS['hH']:.0f} mm  "
+          f"d0/t={PARAMS['d0']:.0f}/{PARAMS['t']:.0f} mm  u/uF={PARAMS['u_uF']}")
+    print("  （改动自选参数用 --set KEY=VAL，完整清单见 --show-params）")
 
     # ---- 2.1 塔顶产品量 ----
     MD = MA * xD + MB * (1 - xD)
@@ -600,7 +634,7 @@ def main():
         c20 = c20_smith(FLV, HT)
         C = c20 * (sig / 20.0) ** 0.2
         uF = C * math.sqrt((rhoL - rhoG) / rhoG)
-        u = 0.8 * uF
+        u = PARAMS["u_uF"] * uF
         An = Vg / u                       # 有效截面积
         AdA = 0.1                         # 弓形降液管 Ad/A 初估
         A = An / (1.0 - AdA)              # 塔总截面积
@@ -712,14 +746,15 @@ def main():
     # ---- 2.12 附属设备（全凝器）----
     r_mix = aD * r_latent_ethanol(T_top) + (1 - aD) * r_latent_water(T_top)
     QT = D * (R + 1) * MD * r_mix
-    mS_cool = QT / (4.18 * (45 - 30)) / 3600.0
-    dtm = ((T_top - 30) - (T_top - 45)) / math.log((T_top - 30) / (T_top - 45))
-    A_cond = QT * 1000.0 / 3600.0 / (915.0 * dtm)
+    t_in, t_out, Kc = PARAMS["t_cool_in"], PARAMS["t_cool_out"], PARAMS["K_cond"]
+    mS_cool = QT / (4.18 * (t_out - t_in)) / 3600.0
+    dtm = ((T_top - t_in) - (T_top - t_out)) / math.log((T_top - t_in) / (T_top - t_out))
+    A_cond = QT * 1000.0 / 3600.0 / (Kc * dtm)
     print("\n[2.12 附属设备（全凝器）]")
     print(f"  塔顶蒸汽潜热 r = {r_mix:.1f} kJ/kg")
     print(f"  热负荷 QT = {QT:.0f} kJ/h = {QT/3600:.1f} kW")
-    print(f"  冷却水量 mS = {mS_cool:.2f} kg/s (30->45℃)")
-    print(f"  平均温差 dtm = {dtm:.1f} ℃   换热面积 A = {A_cond:.1f} m2 (K=915)")
+    print(f"  冷却水量 mS = {mS_cool:.2f} kg/s ({t_in:.0f}->{t_out:.0f}℃)")
+    print(f"  平均温差 dtm = {dtm:.1f} ℃   换热面积 A = {A_cond:.1f} m2 (K={Kc:.0f})")
 
     # ---- 2.13 接管管径（五种）----
     print("\n[2.13 接管管径]  d = sqrt(4V/(pi*u)) 圆整到 GB/T 8163 标准管")
