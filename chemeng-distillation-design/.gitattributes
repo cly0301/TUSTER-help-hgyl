@@ -1,0 +1,7 @@
+# 全部文本文件一律用 LF 换行。
+# 原因：DSH 读取 SKILL.md 的 frontmatter 时按 \n 切行，CRLF 会让首行变成
+# "---\r"、匹配不上 "---"，导致整个 skill 加载失败、预设打不开。
+* text=auto eol=lf
+
+# 二进制文件不做任何转换
+*.pdf binary
