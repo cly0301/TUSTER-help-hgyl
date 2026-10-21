@@ -746,13 +746,14 @@ def main(argv=None):
     # ---- 2.11 塔高 ----
     HT, HT2 = PARAMS["HT"], PARAMS["HT2"]
     n_hole = math.ceil(Ne / PARAMS["hole_every"])
-    H_tray = (Ne_rect - 1) * HT + (Ne_strip - 1) * HT2
+    HF = PARAMS.get("HF", 1.05)          # 进料板处板间距（课件塔高公式的 H_F）
+    H_tray = (Ne_rect - 1) * HT + (Ne_strip - 1) * HT2 + HF
     H_hole = n_hole * PARAMS["hole_h"]
     HE = H_tray + H_hole
     Htot = HE + PARAMS["HD"] + PARAMS["HB"] + PARAMS["HS"]
     print("\n[2.11 塔高]")
     print(f"  精馏段 {Ne_rect} 块 @HT={HT*1000:.0f}mm, 提馏段 {Ne_strip} 块 @HT'={HT2*1000:.0f}mm")
-    print(f"  塔板段高度 = {H_tray:.2f} m")
+    print(f"  塔板段高度 = {H_tray:.2f} m（含进料板间距 HF={HF:.2f} m）")
     print(f"  人孔 {n_hole} 个 x {PARAMS['hole_h']*1000:.0f}mm = {H_hole:.2f} m")
     print(f"  有效高度 HE = {H_tray:.2f} + {H_hole:.2f} = {HE:.2f} m")
     print(f"  塔顶 {PARAMS['HD']}m / 塔底 {PARAMS['HB']}m / 裙座 {PARAMS['HS']}m")
@@ -823,6 +824,14 @@ def main(argv=None):
         lw=tray['lw'], Wd=tray['Wd'], Ad=tray['Ad'], A0=tray['A0'],
         n_holes=tray['n'], phi=tray['phi'], Aa=tray['Aa'],
         u0_rect=hyd['精馏段']['u0'], u0_strip=hyd['提馏段']['u0'],
+        x_list=x_plates,
+        rhoL_rect=results['精馏段']['rhoL'], rhoG_rect=results['精馏段']['rhoG'],
+        sig_rect=results['精馏段']['sig'], HT_rect=results['精馏段']['HT'],
+        rhoL_strip=results['提馏段']['rhoL'], rhoG_strip=results['提馏段']['rhoG'],
+        sig_strip=results['提馏段']['sig'], HT_strip=results['提馏段']['HT'],
+        Vl_rect=results['精馏段']['Vl'], Vg_rect=results['精馏段']['Vg'],
+        Vl_strip=results['提馏段']['Vl'], Vg_strip=results['提馏段']['Vg'],
+        Hd_rect=hyd['精馏段']['Hd'], Hd_strip=hyd['提馏段']['Hd'],
         bad=list(bad), params=dict(PARAMS),
     )
 
