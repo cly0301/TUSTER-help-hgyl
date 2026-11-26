@@ -355,8 +355,54 @@ python resources\design_origin.py --id 23044401
 
 会生成 `负荷性能图_精馏段_<学号>.png`、`负荷性能图_提馏段_<学号>.png` 和一个 `.opju` Origin 工程文件。
 
-> 前提：电脑装了 Origin，且 Python 装了 `originpro` 包
-> 教育版 Origin 同时只能开 10 张表，脚本已按「每段 1 张表」设计
+#### 没装 Origin？免费申请「学习版」
+
+Origin 是收费软件，但官方给学生提供 **OriginPro Learning Edition（学习版）**，完全免费：
+
+| 项 | 学习版 |
+|---|---|
+| 费用 | **免费** |
+| 有效期 | 6 个月（到期重新申请即可） |
+| 功能 | 等同 OriginPro 全功能 |
+| 限制 | 每个工程最多 **12 个窗口**（表格/图），超出部分打不开 |
+| 对象 | 全日制高中生 / 本科生 / 研究生，需**学校邮箱** |
+
+**申请步骤（约 10 分钟）：**
+
+1. 打开申请页：**https://www.originlab.com/OriginProlearning.aspx**
+   （页面可能显示 "Special Promotion for Free OriginPro Learning Edition"）
+2. 拉到页面下方填表：
+
+   | 字段 | 填什么 |
+   |---|---|
+   | Name | 姓名拼音（如 Chen Liyang） |
+   | University | 学校名（如 Tianjin University of Science and Technology） |
+   | Department | 院系（如 Bioengineering） |
+   | E-mail address | **必须用学校邮箱**（如 xxx@tust.edu.cn） |
+   | Confirm E-mail | 再填一次学校邮箱 |
+   | 用途 | 随便写，如 `Course design / 课程设计` |
+   | 同意条款 | 勾选 |
+
+3. 点提交
+4. 去**学校邮箱**查收主题为 **"Verify your email for OriginPro Learning Edition"** 的邮件
+5. 点邮件里的**验证链接**
+6. 会收到**第二封邮件**，里面有下载链接
+7. 下载安装包 → 安装 → 用学校邮箱收到的序列号激活
+
+**注意事项：**
+
+- ⚠️ 6 个月到期后重新申请一次就行，不用卸载重装
+- ⚠️ 每个工程最多 12 个窗口 → 跑 `design_origin.py` 前先关掉别的 Origin 工程
+- ⚠️ 用普通邮箱（QQ/163）申请会被拒，必须学校邮箱
+- 遇到问题发邮件到 **le@originlab.com**
+
+**装完 Origin 还要装 Python 的 originpro 包：**
+
+```
+pip install originpro
+```
+
+> 不想注册 Origin 也完全没关系——`负荷性能图_<学号>.png`（matplotlib 版）已经够用了，Origin 版只是给了个更"科研风"的选择
 
 ---
 
