@@ -146,8 +146,12 @@ def plot_mccabe(d, out_path):
     ax.plot([xW], [xW], "ko", ms=5)
     ax.plot([xF], [mi * xF + bi], "ms", ms=5)
 
-    eq = (f"精馏段操作线: y={mi:.4f}x+{bi:.4f}\n"
-          f"提馏段操作线: y={ms:.4f}x+{bs:.4f}\n"
+    def sign(v):
+        """把 +-0.0022 写成 - 0.0022（带符号，符号与数值分开）。"""
+        return f"+ {v:.4f}" if v >= 0 else f"- {abs(v):.4f}"
+
+    eq = (f"精馏段操作线: y={mi:.4f}x {sign(bi)}\n"
+          f"提馏段操作线: y={ms:.4f}x {sign(bs)}\n"
           f"q 线: x={xF:.4f}（泡点进料 q=1）\n"
           f"理论级数 {d['n_rect']+d['n_strip']}（精{d['n_rect']}+提{d['n_strip']}，含塔釜）\n"
           f"理论板 N={d['N_trays']}  实际板 Ne={d['Ne']}（精{d['Ne_rect']}+提{d['Ne_strip']}）")

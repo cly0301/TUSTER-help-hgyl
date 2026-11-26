@@ -63,6 +63,9 @@ def render(dxf_path, out_path, box=None, px=1600.0):
              ).draw_layout(msp, finalize=True)
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
+    # ezdxf 的 MatplotlibBackend 在 finalize 时会改写 figure 尺寸，
+    # 这里重新按 px 设定，保证 --px 真正生效。
+    fig.set_size_inches(px / 100.0, px * (h / w) / 100.0)
     fig.savefig(out_path, dpi=100, facecolor="white")
     plt.close(fig)
     return out_path

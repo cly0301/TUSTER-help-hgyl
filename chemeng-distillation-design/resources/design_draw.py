@@ -26,16 +26,18 @@ from ezdxf.enums import TextEntityAlignment
 BASE = os.path.dirname(os.path.abspath(__file__))
 CALC = os.path.join(BASE, "design_calc.py")
 
-# ── 绘图约定（GB/T 4457.4 线宽系列）────────────────────────────────────────
+# ── 绘图约定（对齐样板 21798 装配图的图层规范）────────────────────────────
 LAYERS = [
-    ("粗实线", 7, "CONTINUOUS", 70),      # 设备轮廓、可见轮廓
-    ("细实线", 7, "CONTINUOUS", 25),      # 尺寸线、引出线、剖面线、表格
-    ("点画线", 7, "CENTER", 25),          # 中心线、轴线
-    ("双点画线", 7, "PHANTOM", 25),       # 假想轮廓：人孔开孔、液位
-    ("虚线", 7, "DASHED", 35),            # 不可见轮廓
-    ("剖面线", 7, "CONTINUOUS", 18),
-    ("文字", 7, "CONTINUOUS", 25),
-    ("图框", 7, "CONTINUOUS", 70),
+    ("粗实线", 7, "CONTINUOUS", 40),      # 设备轮廓、可见轮廓（0.40 mm）
+    ("细实线", 7, "CONTINUOUS", 13),      # 尺寸线、引出线、剖面线、表格（0.13 mm）
+    ("点画线", 7, "CENTER", 13),          # 中心线、轴线
+    ("双点画线", 7, "PHANTOM", 13),       # 假想轮廓：人孔开孔、液位
+    ("虚线", 7, "DASHED", 18),            # 不可见轮廓
+    ("剖面线", 7, "CONTINUOUS", 13),
+    ("引出线", 7, "CONTINUOUS", 13),      # 零件序号引出线
+    ("文字", 7, "CONTINUOUS", 13),
+    ("尺寸标注", 7, "CONTINUOUS", 13),
+    ("图框", 7, "CONTINUOUS", 50),
     ("标题栏", 7, "CONTINUOUS", 25),
 ]
 
@@ -48,9 +50,9 @@ def new_doc():
         if lt != "CONTINUOUS" and lt not in doc.linetypes:
             lt = "CONTINUOUS"
         doc.layers.add(name, color=color, linetype=lt, lineweight=lw)
-    # 中文字样式：仿宋（GB 制图长仿宋体）。指定 TTF 文件名，AutoCAD 与
-    # ezdxf 渲染器都能找到字形；若被大字体样式覆盖会变成方块。
-    doc.styles.add("HZ", font="simfang.ttf")
+    # 中文样式：黑体（simhei）。不用仿宋/宋体——实测这两个字体的「图」
+    # 字在 ezdxf/matplotlib 渲染时会出现黑色三角伪影（轮廓填充错误）。
+    doc.styles.add("HZ", font="simhei.ttf")
     ds = doc.dimstyles.get("Standard")
     ds.dxf.dimtxt, ds.dxf.dimasz = 3.0, 2.5
     ds.dxf.dimexe, ds.dxf.dimexo = 1.5, 1.0
@@ -89,6 +91,20 @@ class Sheet:
 
     def circle(self, c, r, layer="粗实线"):
         self.msp.add_circle(c, r, dxfattribs={"layer": layer})
+
+    def dim(self, p1, p2, base, angle=0, text=None, layer="尺寸标注"):
+        """真线性尺寸标注（DIMENSION 实体，AutoCAD 里可驱动/可编辑）。
+
+        p1、p2 为被测两点，base 为尺寸线通过点（决定偏移方向）；
+        text 可写 "H=<>"、"φ<>" 之类，< > 会被替换成实测值。
+        """
+        kw = dict(base=base, p1=p1, p2=p2, angle=angle,
+                  dimstyle="Standard", dxfattribs={"layer": layer})
+        if text is not None:
+            kw["text"] = text
+        d = self.msp.add_linear_dim(**kw)
+        d.render()
+        return d
 
     def text(self, s, pos, h=3.0, layer="文字", align="left", rot=0.0):
         a = {"left": TextEntityAlignment.LEFT,
@@ -145,14 +161,14 @@ class Sheet:
         self.text("日期", (x0 + 62, y0 + 12), 3.0, L, "mid")
         self.text(meta.get("date", ""), (x0 + 62, y0 + 4), 3.0, L, "mid")
         self.text(meta.get("project", ""), (x0 + 122, y0 + 44), 3.0, L, "mid")
-        self.text(meta.get("title1", ""), (x0 + 122, y0 + 29), 4.5, L, "center")
-        self.text(meta.get("title2", ""), (x0 + 122, y0 + 12), 4.5, L, "center")
+        self.text(meta.get("title1", ""), (x0 + 144, y0 + 29), 3.5, L, "center")
+        self.text(meta.get("title2", ""), (x0 + 144, y0 + 12), 3.5, L, "center")
         self.text("图号", (x0 + 2, y0 + 52), 3.0, L, "mid")
         self.text(meta.get("dwg_no", ""), (x0 + 34, y0 + 52), 3.0, L, "mid")
         self.text("比例", (x0 + 88, y0 + 52), 3.0, L, "mid")
         self.text(meta.get("scale", ""), (x0 + 106, y0 + 52), 3.0, L, "mid")
-        self.text(f"共{meta.get('sheets',1)}张  第{meta.get('sheet',1)}张",
-                  (x0 + 158, y0 + 52), 2.5, L, "mid")
+        self.text(f"共{meta.get('sheets',1)}张 第{meta.get('sheet',1)}张",
+                  (x0 + 124, y0 + 52), 2.2, L, "mid")
         self.rect(x0 + 168, y0 + 48, x1, y0 + 56, "标题栏")
         self.text(self.size, (x0 + 174, y0 + 52), 3.5, L, "center")
 
@@ -347,14 +363,17 @@ def build_spec_table(data, p):
 def build_nozzle_table(data, p, elevations=None):
     elevations = elevations or {}
     rows = [
-        ("a1",  "DN300", "PN10 DN300 GB/T 9119", "PL/RF", "塔顶蒸气出口"),
-        ("b1",  "DN80",  "PN10 DN80  GB/T 9119", "PL/RF", "回流口"),
+        ("a",   "DN300", "PN10 DN300 GB/T 9119", "PL/RF", "塔顶蒸气出口"),
+        ("b",   "DN80",  "PN10 DN80  GB/T 9119", "PL/RF", "回流口"),
         ("c",   "DN50",  "PN10 DN50  GB/T 9119", "PL/RF", "进料口"),
         ("d",   "DN65",  "PN10 DN65  GB/T 9119", "PL/RF", "釜液出口"),
-        ("e1",  "DN300", "PN10 DN300 GB/T 9119", "PL/RF", "加热蒸汽入口"),
+        ("e",   "DN300", "PN10 DN300 GB/T 9119", "PL/RF", "加热蒸汽入口"),
         ("f1",  "DN25",  "PN10 DN25  GB/T 9119", "PL/RF", "液面计上口"),
         ("f2",  "DN25",  "PN10 DN25  GB/T 9119", "PL/RF", "液面计下口"),
-        ("h1-7", "DN450", "—", "—", "人孔（见主视图）"),
+        ("g",   "DN80",  "PN10 DN80  GB/T 9119", "PL/RF", "安全阀口"),
+        ("h",   "DN50",  "PN10 DN50  GB/T 9119", "PL/RF", "放空口"),
+        ("i",   "DN40",  "PN10 DN40  GB/T 9119", "PL/RF", "温度计口"),
+        ("j",   "DN450", "—", "—", "人孔（见主视图）"),
     ]
     out = []
     for sym, dn, std, face, use in rows:
@@ -369,25 +388,49 @@ def build_bom(data, p):
     nh = int(data["n_hole"])
     DN = f"DN{data['d_rect']*1000:.0f}"
     return [
-        ("筒体",     f"{DN}×6",              "Q235-B", "1",  ""),
-        ("封头",     f"{DN}×6",              "Q235-B", "2",  "椭圆封头"),
-        ("裙座",     f"{DN}×6",              "Q235-B", "1",  ""),
-        ("基础环",   "δ=28",                 "Q235-B", "1",  ""),
-        ("压板",     "δ=36",                 "Q235-B", "28", ""),
-        ("筋板",     "δ=18",                 "Q235-B", "56", ""),
-        ("塔盘",     "筛板 δ=4",             "Q235-B", str(Ne), "含支承板"),
-        ("降液管",   "δ=4",                  "Q235-B", str(Ne), ""),
-        ("人孔",     "DN450",                "组合件", str(nh), "回转盖"),
-        ("补强圈",   "DN450 / DN125",        "Q235-B", "—",  "人孔/小接管"),
-        ("除沫器",   DN,                     "组合件", "1",  "丝网"),
-        ("吊柱",     "800",                  "Q235-B", "1",  ""),
-        ("液封槽",   "δ=5",                  "Q235-B", "1",  ""),
-        ("保温圈",   "δ=4",                  "Q235-B", "6",  ""),
-        ("接管",     "φ325/89/57/76/32",     "20",     "9",  "各管口"),
-        ("法兰",     "PN10 DN300~25",        "Q235-B", "18", "各管口"),
-        ("垫片/螺栓/螺母", "δ=2 / M12×60",   "组合件", "—",  "随法兰配套"),
-        ("液面计",   "PN16",                 "组合件", "2",  ""),
-        ("裙座人孔", "DN600",                "组合件", "1",  ""),
+        ("筒体",             f"{DN}×6",              "Q235-B", "1",  ""),
+        ("封头",             f"{DN}×6",              "Q235-B", "2",  "椭圆封头"),
+        ("裙座",             f"{DN}×6",              "Q235-B", "1",  ""),
+        ("基础环",           "δ=28",                 "Q235-B", "1",  ""),
+        ("压板",             "δ=36",                 "Q235-B", "28", ""),
+        ("筋板",             "δ=18",                 "Q235-B", "56", ""),
+        ("塔盘",             "筛板 δ=4",             "Q235-B", str(Ne), "含支承板"),
+        ("降液管",           "δ=4",                  "Q235-B", str(Ne), ""),
+        ("塔盘支承板",       "δ=6",                  "Q235-B", str(Ne*2), "L 形"),
+        ("人孔",             "DN450",                "组合件", str(nh), "回转盖"),
+        ("补强圈",           "DN450 / DN125",        "Q235-B", "—",  "人孔/小接管"),
+        ("除沫器",           DN,                     "组合件", "1",  "丝网"),
+        ("吊柱",             "800",                  "Q235-B", "1",  ""),
+        ("液封槽",           "δ=5",                  "Q235-B", "1",  ""),
+        ("保温圈",           "δ=4",                  "Q235-B", "6",  ""),
+        ("塔顶蒸气接管",     "φ325×8",               "20",     "1",  "管口 a"),
+        ("回流接管",         "φ89×4",                "20",     "1",  "管口 b"),
+        ("进料接管",         "φ57×3.5",              "20",     "1",  "管口 c"),
+        ("釜液接管",         "φ76×4",                "20",     "1",  "管口 d"),
+        ("加热蒸汽接管",     "φ325×8",               "20",     "1",  "管口 e"),
+        ("液面计接管",       "φ32×3",                "20",     "2",  "管口 f1/f2"),
+        ("安全阀接口",       "DN80",                 "20",     "1",  "管口 g"),
+        ("放空口",           "DN50",                 "20",     "1",  "管口 h"),
+        ("温度计套管",       "DN40",                 "20",     "2",  "塔顶/塔釜"),
+        ("压力表接头",       "DN25",                 "20",     "2",  ""),
+        ("法兰",             "PN10 DN300~25",        "Q235-B", "18", "各管口"),
+        ("法兰盖",           "PN10 DN50",            "Q235-B", "2",  "备用口"),
+        ("垫片",             "δ=2 石棉橡胶",         "组合件", "20", "随法兰配套"),
+        ("螺栓/螺母",        "M12×60 / M12",         "35CrMoA","80", "随法兰配套"),
+        ("液面计",           "PN16",                 "组合件", "2",  ""),
+        ("裙座人孔",         "DN600",                "组合件", "1",  ""),
+        ("接地板",           "δ=10",                 "Q235-B", "2",  ""),
+        ("铭牌",             "200×130",              "组合件", "1",  ""),
+        ("塔顶吊耳",         "δ=16",                 "Q235-B", "2",  ""),
+        ("塔体保温层",       "δ=100 岩棉",            "组合件", "1",  "外护铝皮"),
+        ("平台 / 梯子",      "—",                    "组合件", "1",  "每 6 块板一层"),
+        ("视镜",             "DN80",                 "组合件", "2",  ""),
+        ("防涡流挡板",       "δ=6",                  "Q235-B", "1",  "釜液出口"),
+        ("蒸汽分布器",       "φ57×3.5",              "20",     "1",  "塔底鼓泡"),
+        ("人孔盖",           "DN450",                "组合件", str(nh), "随人孔"),
+        ("人孔密封垫",       "δ=3",                  "组合件", str(nh), "随人孔"),
+        ("地脚螺栓",         "M30×500",              "35CrMoA","28", "随基础环"),
+        ("塔顶放空阀",       "DN50",                 "组合件", "1",  ""),
     ]
 
 
@@ -461,7 +504,11 @@ def draw_tray_plan(sh, cx, cy, sc, data, p, tag="塔板布置图", hole_skip=3):
             (cx, cy + R + 9), 3.0, "文字", "center")
     sh.text(f"（图中筛孔按示意表示，未按实际孔数绘制）",
             (cx, cy + R + 4.5), 2.5, "文字", "center")
-    sh.text(f"堰长 {lw*1000:.0f}", (cx - x_bow, cy + y_half + 4), 3.0, "文字", "center")
+    # 真尺寸标注：堰长（弦长）+ 塔板直径（不再另写文字，避免重复）
+    sh.dim((xc, cy - y_half), (xc, cy + y_half), base=(xc - 10, cy - y_half),
+           angle=90, text=f"{lw*1000:.0f}")
+    sh.dim((cx - R, cy), (cx + R, cy), base=(cx - R, cy - R - 6.5),
+           angle=0, text=f"φ{D*1000:.0f}")
     # 区域标注（让图能看懂）
     sh.leader((cx - x_lim * 0.55, cy - y_half * 0.62),
               (cx - R - 16, cy - R * 0.6), "筛孔区", 3.2, "right")
@@ -509,12 +556,10 @@ def draw_downcomer_detail(sh, cx, cy, sc, data, p, tag="塔板主视图（局部
     sh.line((x_let + 2.0, y_top), (x_let + 2.0, y_top + f(hw)), "粗实线")
     sh.line((x_let, y_top + f(hw)), (x_let + 2.0, y_top + f(hw)), "粗实线")
 
-    # 尺寸
+    # 尺寸（真 DIMENSION，文字按实值覆盖）
     xd = x_let - 9
-    sh.line((x_let, y_bot), (xd, y_bot), "细实线")
-    sh.line((x_let, y_top), (xd, y_top), "细实线")
-    sh.line((xd, y_bot), (xd, y_top), "细实线")
-    sh.text(f"{HT*1000:.0f}", (xd - 1.5, (y_bot + y_top) / 2), 3.0, "文字", "center", 90)
+    sh.dim((x_let, y_bot), (x_let, y_top), base=(xd, y_bot),
+           angle=90, text=f"{HT*1000:.0f}")
 
     sh.leader((x_wall, y_seal), (x_wall + 12, y_seal - 12),
               f"底隙 {clearance*1000:.0f}", 3.0, "mid")
@@ -912,24 +957,13 @@ def draw_assembly(data, xuehao, out_path, params=None):
     # ---- 中心线 ----
     sh.centerline((cx, y_base - 12), (cx, y_head + b + 8))
 
-    # ---- 尺寸标注：塔高、塔径 ----
+    # ---- 尺寸标注：塔高、塔径（真 DIMENSION 实体，文字按实值覆盖）----
     xdim = cx + R + 56
-    sh.line((cx + R + 3, y_base), (xdim + 3, y_base), "细实线")
-    sh.line((cx + R + 3, y_head), (xdim + 3, y_head), "细实线")
-    sh.line((xdim, y_base), (xdim, y_head), "细实线")
-    sh.line((xdim - 2.5, y_base), (xdim + 2.5, y_base), "细实线")
-    sh.line((xdim - 2.5, y_head), (xdim + 2.5, y_head), "细实线")
-    sh.text(f"H={data['Htot']:.1f}m", (xdim + 3.5, (y_base + y_head) / 2), 3.5,
-            "文字", "left", 90)
+    sh.dim((cx + R, y_base), (cx + R, y_head), base=(xdim, y_base),
+           angle=90, text=f"H={data['Htot']:.1f}m")
 
-    sh.line((cx - R, y_base - 11), (cx - R, y_base - 17), "细实线")
-    sh.line((cx + R, y_base - 11), (cx + R, y_base - 17), "细实线")
-    sh.line((cx - R, y_base - 14), (cx + R, y_base - 14), "细实线")
-    sh.line((cx - R, y_base - 14), (cx - R + 2.5, y_base - 12.5), "细实线")
-    sh.line((cx - R, y_base - 14), (cx - R + 2.5, y_base - 15.5), "细实线")
-    sh.line((cx + R, y_base - 14), (cx + R - 2.5, y_base - 12.5), "细实线")
-    sh.line((cx + R, y_base - 14), (cx + R - 2.5, y_base - 15.5), "细实线")
-    sh.text(f"φ{int(d_col*1000)}", (cx, y_base - 16.5), 3.5, "文字", "center")
+    sh.dim((cx - R, y_base), (cx + R, y_base), base=(cx - R, y_base - 14),
+           angle=0, text=f"φ{int(d_col*1000)}")
 
     sh.text(f"主视图  1:{SCALE:g}", (cx, y_base - 28), 5.0, "文字", "center")
 
@@ -941,31 +975,43 @@ def draw_assembly(data, xuehao, out_path, params=None):
     draw_downcomer_detail(sh, cL, 470.0, 4.0, data, p)      # 塔板主视图   1:4
     draw_nozzle_detail(sh, cR, 470.0, 5.0, data, p)         # 进料口详图   1:5
     draw_hole_detail(sh, cL, 240.0, 0.5, p)                 # 筛孔排列详图 2:1
+    draw_skirt_detail(sh, cR - 35.0, 240.0, 20.0, data, p)         # 裙座详图     1:10
 
     # ---- 零部件序号（对应明细栏，全部放在左侧空白区，引线水平指向塔体）----
     hole_ys = [y for (y, n, is_hole) in plates if is_hole]
     tray_ys = [y for (y, n, is_hole) in plates]
     y_mh = hole_ys[len(hole_ys) // 2] if hole_ys else 400.0
     y_tray = tray_ys[len(tray_ys) // 2] if tray_ys else 400.0
-    part_bubble(sh, 1,  (58.0, 520.0), (cx - R, 520.0))                 # 筒体
-    part_bubble(sh, 2,  (76.0, 758.0), (cx - R + 6, y_head + b * 0.4))  # 上封头
-    part_bubble(sh, 3,  (58.0, 104.0), (cx - R, 104.0))                 # 裙座
-    part_bubble(sh, 4,  (58.0, 58.0), (cx - R - 2, 58.0))               # 基础环
-    part_bubble(sh, 5,  (58.0, 48.0), (cx - R - 6, 51.0))               # 压板
-    part_bubble(sh, 6,  (58.0, 38.0), (cx - R - 4, 53.0))               # 筋板
-    part_bubble(sh, 7,  (58.0, y_tray), (cx - R, y_tray))               # 塔盘
-    part_bubble(sh, 8,  (58.0, y_tray - 14.0), (cx - R + 4, y_tray - 14.0))  # 降液管
-    part_bubble(sh, 9,  (58.0, y_mh), (cx - R, y_mh))                   # 人孔
-    part_bubble(sh, 10, (58.0, y_feed - 10.0), (cx - R, y_feed - 10.0))          # 补强圈（进料口）
-    part_bubble(sh, 11, (76.0, 738.0), (cx - R + 6, y_dm))              # 除沫器
-    part_bubble(sh, 12, (100.0, 785.0), (cx, y_lug + 3.5))              # 吊柱
-    part_bubble(sh, 13, (58.0, 138.0), (cx - R + 6, 138.0))             # 液封槽
-    part_bubble(sh, 14, (58.0, 620.0), (cx - R - 2.5, 620.0))           # 保温圈
-    part_bubble(sh, 15, (58.0, 718.0), (cx - R, y_head - mm(0.25)))     # 接管
-    part_bubble(sh, 16, (58.0, 696.0), (cx - R - mm(0.30), y_head - mm(0.25)))  # 法兰
-    part_bubble(sh, 17, (58.0, y_feed - 26.0), (cx - R - mm(0.30), y_feed - 10.0))  # 垫片/螺栓
-    part_bubble(sh, 18, (136.0, 118.0), (cx + R + mm(0.30) + 3.0, 106.0))  # 液面计
-    part_bubble(sh, 19, (58.0, 86.0), (cx + 4, 92.0))                   # 裙座人孔
+    part_bubble(sh, 1,  (36.0, 520.0), (cx - R, 520.0))                 # 筒体
+    part_bubble(sh, 2,  (36.0, 758.0), (cx - R + 6, y_head + b * 0.4))  # 上封头
+    part_bubble(sh, 3,  (36.0, 104.0), (cx - R, 104.0))                 # 裙座
+    part_bubble(sh, 4,  (36.0, 58.0), (cx - R - 2, 58.0))               # 基础环
+    part_bubble(sh, 5,  (36.0, 48.0), (cx - R - 6, 51.0))               # 压板
+    part_bubble(sh, 6,  (36.0, 38.0), (cx - R - 4, 53.0))               # 筋板
+    part_bubble(sh, 7,  (36.0, y_tray), (cx - R, y_tray))               # 塔盘
+    part_bubble(sh, 8,  (36.0, y_tray - 26.0), (cx - R + 4, y_tray - 26.0))  # 降液管
+    part_bubble(sh, 9,  (36.0, y_tray - 52.0), (cx - R + 7, y_tray - 52.0))  # 塔盘支承板
+    part_bubble(sh, 10, (36.0, y_mh), (cx - R, y_mh))                   # 人孔
+    part_bubble(sh, 11, (36.0, y_feed - 10.0), (cx - R, y_feed - 10.0))          # 补强圈（进料口）
+    part_bubble(sh, 12, (76.0, 738.0), (cx - R + 6, y_dm))              # 除沫器
+    part_bubble(sh, 13, (100.0, 785.0), (cx, y_lug + 3.5))              # 吊柱
+    part_bubble(sh, 14, (36.0, 138.0), (cx - R + 6, 138.0))             # 液封槽
+    part_bubble(sh, 15, (36.0, 620.0), (cx - R - 2.5, 620.0))           # 保温圈
+    part_bubble(sh, 16, (36.0, 718.0), (cx - R, y_head - mm(0.25)))     # 塔顶蒸气接管
+    part_bubble(sh, 26, (36.0, 696.0), (cx - R - mm(0.30), y_head - mm(0.25)))  # 法兰
+    part_bubble(sh, 28, (36.0, y_feed - 26.0), (cx - R - mm(0.30), y_feed - 10.0))  # 垫片
+    part_bubble(sh, 30, (136.0, 118.0), (cx + R + mm(0.30) + 3.0, 106.0))  # 液面计
+    part_bubble(sh, 31, (36.0, 86.0), (cx + 4, 92.0))                   # 裙座人孔
+    part_bubble(sh, 34, (36.0, 180.0), (cx - R, 180.0))                 # 塔顶吊耳
+    part_bubble(sh, 35, (36.0, 220.0), (cx - R - 2.5, 220.0))           # 保温层
+    part_bubble(sh, 36, (36.0, 260.0), (cx - R - 4.0, 260.0))           # 平台/梯子
+    part_bubble(sh, 37, (36.0, 300.0), (cx - R, 300.0))                 # 视镜
+    part_bubble(sh, 38, (36.0, 340.0), (cx - R + 6, 340.0))             # 防涡流挡板
+    part_bubble(sh, 39, (36.0, 400.0), (cx - R + 8, 400.0))             # 蒸汽分布器
+    part_bubble(sh, 40, (36.0, 440.0), (cx - R, 440.0))                 # 人孔盖
+    part_bubble(sh, 41, (36.0, 480.0), (cx - R - 2.0, 480.0))           # 人孔密封垫
+    part_bubble(sh, 42, (36.0, 70.0), (cx - R - 8.0, 62.0))             # 地脚螺栓
+    part_bubble(sh, 43, (36.0, 660.0), (cx - R + 4, 660.0))             # 塔顶放空阀
 
     # ---- 右侧表格 ----
     draw_spec_tables(sh, data, p, sh.x1, nozzle_elev)
@@ -1001,9 +1047,9 @@ def draw_tray(data, xuehao, out_path, params=None):
         ("堰上液头 how", f"{float(data['how'])*1000:.1f} mm"),
         ("板上清液层 hL", f"{float(p.get('hL',50)):.0f} mm"),
         ("降液管宽 Wd", f"{float(data['Wd'])*1000:.0f} mm"),
-        ("降液管面积 Ad", f"{float(data['Ad']):.4f} m²"),
+        ("降液管面积 Ad", f"{float(data['Ad']):.4f} m2"),
         ("降液管底隙 hH", f"{float(p.get('hH',28)):.0f} mm"),
-        ("开孔区 A0", f"{float(data['A0']):.4f} m²"),
+        ("开孔区 A0", f"{float(data['A0']):.4f} m2"),
         ("筛孔孔径 d0", f"{float(p.get('d0',5)):.0f} mm"),
         ("孔距 t", f"{float(p.get('t',17)):.0f} mm"),
         ("开孔率 φ", f"{float(data.get('phi_hole', data.get('phi',0))):.4f}"),
@@ -1215,6 +1261,26 @@ def draw_flow(data, xuehao, out_path, params=None):
     arrow((lx - 8, ly - 16), (lx + 8, ly - 16))
     sh.text("物料线", (lx + 12, ly - 17), 2.6, "文字", "mid")
 
+    # ---- 设备一览表（左下角）----
+    dev_rows = [
+        ("1", "精馏塔",     "T-101", "φ%d×%d" % (data['d_rect']*1000, data['Htot']*1000), "1"),
+        ("2", "原料预热器", "E-102", "A=7 m2",                                        "1"),
+        ("3", "全凝器",     "E-101", "A=%.1f m2" % float(data.get("A_cond", 25.4)),   "1"),
+        ("4", "产品冷却器", "E-103", "A=3 m2",                                        "1"),
+        ("5", "回流罐",     "V-101", "V=2.5 m3",                                      "1"),
+        ("6", "进料泵",     "P-102", "Q=2.8 m3/h",                                    "2"),
+        ("7", "回流泵",     "P-101", "Q=3.4 m3/h",                                    "2"),
+    ]
+    dcol = [10.0, 38.0, 20.0, 42.0, 12.0]
+    drow = [7.0] * (len(dev_rows) + 1)
+    gx, gy = 15.0, 80.0
+    grid(sh, gx, gy, dcol, drow, "细实线")
+    for c, s in enumerate(["序号", "设备名称", "位号", "规格", "数量"]):
+        cell(sh, gx, gy, dcol, drow, 0, c, s, 2.6)
+    for r, row in enumerate(dev_rows, start=1):
+        for c, s in enumerate(row):
+            cell(sh, gx, gy, dcol, drow, r, c, s, 2.4)
+
     doc.saveas(out_path)
     return out_path
 
@@ -1249,8 +1315,8 @@ def main(argv=None):
         fn(data, args.id, path, data.get("params"))
         print(f"已生成 {path}")
         made += 1
-    print(f"\n共 {made} 张。塔径 {data['d_rect']} m、实际板 {data['Ne']} 块、"
-          f"全塔高 {data['Htot']} m")
+    print(f"\n共 {made} 张。塔径 {data['d_rect']:g} m、实际板 {data['Ne']} 块、"
+          f"全塔高 {data['Htot']:.2f} m")
 
 
 if __name__ == "__main__":
