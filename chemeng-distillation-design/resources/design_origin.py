@@ -176,7 +176,8 @@ def main():
     args = ap.parse_args()
 
     d = dp.get_json(args.id)
-    outdir = args.out or os.getcwd()
+    # 必须用绝对路径：Origin 的 save_fig 不认相对路径，会存到它自己的工作目录
+    outdir = os.path.abspath(args.out or os.getcwd())
     os.makedirs(outdir, exist_ok=True)
 
     try:
@@ -196,8 +197,27 @@ def main():
     except Exception:
         pass
 
+    # 并排合成一张标准图（装订进说明书用这个）
+    combined = None
+    try:
+        from PIL import Image
+
+        a = Image.open(pngs[0])
+        b = Image.open(pngs[1])
+        h = max(a.height, b.height)
+        w = a.width + b.width
+        canvas = Image.new("RGB", (w, h), "white")
+        canvas.paste(a, (0, 0))
+        canvas.paste(b, (a.width, 0))
+        combined = os.path.join(outdir, f"负荷性能图_{args.id}.png")
+        canvas.save(combined)
+    except Exception as e:
+        print("合成失败（单图仍可用）：", e)
+
     for p in pngs:
         print("已导出", p)
+    if combined:
+        print("已合成", combined)
     print("已保存工程", opju)
 
 

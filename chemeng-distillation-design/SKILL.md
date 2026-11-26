@@ -33,8 +33,8 @@ python resources/design_calc.py --id 23044401 --set HT=0.35 HT2=0.65 lw_ratio=0.
 
 **第 6 步 · 一键出图**：
 - `python resources/design_draw.py --id <学号>` → 3 张 DXF（装配图 / 塔板布置图 / 工艺流程图），详见 5.8
-- `python resources/design_plot.py --id <学号>` → 2 张 PNG（负荷性能图 / 图解理论板图），详见 5.9
-- `python resources/design_origin.py --id <学号>` → **Origin 版负荷性能图**（2 张 PNG + .opju 工程），详见 5.10——老师要求 Origin 时用这个
+- `python resources/design_plot.py --id <学号>` → 1 张 PNG（图解理论板图），详见 5.9
+- `python resources/design_origin.py --id <学号>` → **塔板负荷性能图（Origin 版，唯一出处）**：2 张分段 PNG + 1 张合成 PNG + .opju 工程，详见 5.10
 
 > 出完图后别忘了把 DXF 转 PNG 预览：`python resources/preview.py <dxf>`，并把最新图同步给使用者。
 
@@ -48,8 +48,8 @@ python resources/design_calc.py --id 23044401 --set HT=0.35 HT2=0.65 lw_ratio=0.
 - `resources/ethanol-water-vle.csv` —— 乙醇-水常压气液平衡数据
 - `resources/design_calc.py` —— 一键设计计算脚本（从物料衡算一直到接管管径），**数值的唯一来源**
 - `resources/design_draw.py` —— 一键出图脚本（装配图 / 塔板布置图 / 工艺流程图，生成 DXF）
-- `resources/design_plot.py` —— 生成课设附图（负荷性能图、图解理论板图，PNG）
-- `resources/design_origin.py` —— **Origin 版负荷性能图**（按参考样式出 2 张 PNG + 1 个 .opju 工程，见 5.10）
+- `resources/design_plot.py` —— 生成图解理论板图（PNG）
+- `resources/design_origin.py` —— **塔板负荷性能图（Origin 版，唯一出处）**：2 张分段 PNG + 1 张合成 PNG + 1 个 .opju 工程，见 5.10
 - `resources/preview.py` —— 把 DXF 渲染成 PNG（不用开 AutoCAD 就能看图）
 - `requirements.txt` —— 出图依赖（ezdxf / matplotlib / numpy）；**纯计算不需要**（`design_calc.py` 只用 Python 标准库）
 
@@ -359,30 +359,30 @@ python resources/design_draw.py --id <学号> --set HT=0.4     # 带自选参数
 python resources/design_plot.py --id <学号>
 ```
 
-生成两张 PNG（装订进说明书正文）：
+生成 **1 张 PNG**（装订进说明书正文）：
 - `理论板图_<学号>.png` —— 平衡线 / 操作线 / q 线 / 对角线 + 阶梯 + 板号 + 塔顶塔釜局部放大 + 3 条线方程 + 理论级数/理论板/实际板数
-- `负荷性能图_<学号>.png` —— 精馏段、提馏段各一幅：漏液线 / 雾沫夹带线 / 液泛线 / 液相上、下限 + 操作点 + 操作线 + 操作弹性
 
-### 5.10 Origin 版负荷性能图（可选，老师指定 Origin 时用）
+> 塔板负荷性能图**不再用 matplotlib 画**，统一由 5.10 的 `design_origin.py` 出（老师指定要 Origin 风格）。
 
-若老师要求用 **Origin** 出图，或需要 `.opju` 工程文件可继续手改：
+### 5.10 塔板负荷性能图（design_origin.py，Origin 版，唯一出处）
 
 ```
 python resources/design_origin.py --id <学号>
 ```
 
-输出：
-- `负荷性能图_精馏段_<学号>.png`、`负荷性能图_提馏段_<学号>.png`（两幅分开）
-- `负荷性能图_Origin_<学号>.opju`（Origin 工程，用 Origin 打开可继续调）
+**输出 4 个文件：**
+- `负荷性能图_<学号>.png` —— **合成图**（精馏段 | 提馏段并排），说明书里用这张
+- `负荷性能图_精馏段_<学号>.png`、`负荷性能图_提馏段_<学号>.png` —— 两幅分开
+- `负荷性能图_Origin_<学号>.opju` —— Origin 工程，用 Origin 打开可继续调
 
 **样式按参考图「气体液相负荷性能图」**：横轴 `V_L (m3/s)`、纵轴 `V_G (m3/s)`；五条线各带标记——漏液线■黑、液泛线●红、雾沫夹带上限线▲蓝、液相流率下限▼绿、液相流率上限◆品红；操作点用十字标记并标坐标；图上标注 `V_Gmax`、`V_Gmin`、`操作弹性`、`稳定系数`。
 
-> **依赖**：Origin + `originpro` 包，用 DSH Origin 插件的 venv 跑：
+> **依赖**：Origin（免费学习版申请见 README 5.7）+ `originpro` + `pillow` 包，用 DSH Origin 插件的 venv 跑：
 > `C:\Users\<用户名>\dsh_origin_plugin\.venv\Scripts\python.exe resources\design_origin.py --id <学号>`
 >
-> **教育版注意**：Origin 教育版同时只能开 10 张表，脚本已按「每段 1 张表、共 2 张」设计；跑之前建议先关掉 Origin 里其他工程。
+> **教育版注意**：Origin 学习版每个工程最多 12 个窗口，脚本已按「每段 1 张表、共 2 张」设计；跑之前建议先关掉 Origin 里其他工程。
 >
-> **坑**：`PAN2HORZ` 双面板模板会把同层曲线强制归为组样式（颜色/标记全变成同一套），所以脚本改用 **2 个独立 `line` 图**，需要合成一张时再用 PIL 并排拼。
+> **坑**：`PAN2HORZ` 双面板模板会把同层曲线强制归为组样式（颜色/标记全变成同一套），所以脚本改用 **2 个独立 `line` 图**，再用 PIL 并排合成。
 
 ## 6. 复算与验证
 
@@ -409,7 +409,7 @@ python resources/design_origin.py --id <学号>
 | 23041234 | 412/34 | 4.08 | 23 | 40 | 1.2 m | 22.2 m | 1:30 |
 
 - **装配图比例按塔高自适应**（`SCALE = ceil(Htot×1000/741/5)×5`），任何塔高都不会溢出图框，不用手工调。
-- 3 张 DXF + 2 张 PNG 全部随学号变；`design_draw.py` / `design_plot.py` 只接 `--id <学号>` 即可。
+- 3 张 DXF + 1 张理论板图 PNG + 4 个负荷性能图文件全部随学号变；三个脚本都只接 `--id <学号>` 即可。
 
 图解法理论板数允许 ±1到2 块读图差异。
 

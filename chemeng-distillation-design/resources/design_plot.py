@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""生成课设附图：负荷性能图 + 图解理论板图（matplotlib）。
+"""生成课设附图：图解理论板图（matplotlib）。
+
+塔板负荷性能图已改用 Origin 出，见 design_origin.py。
 
 用法：
     python design_plot.py --id 23044401
@@ -7,7 +9,6 @@
 
 输出：
     理论板图_<学号>.png      平衡线/操作线/q线/对角线 + 阶梯 + 板号 + 塔顶塔釜局部放大 + 3 条线方程
-    负荷性能图_<学号>.png    五条线 + 操作点 + 操作线（精馏段/提馏段两幅）
 """
 
 import argparse
@@ -235,40 +236,9 @@ def _load_perf_curves(d, name):
             VL_lo, VL_hi, VLop, VVop)
 
 
-def plot_loading(d, out_path):
-    _setup_matplotlib()
-    import matplotlib.pyplot as plt
+# 注：塔板负荷性能图的 matplotlib 版本已移除，改由 design_origin.py 用 Origin 出。
+# 本文件只负责生成「图解理论板图」；_load_perf_curves 仍被 design_origin.py 复用。
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 6.2), facecolor="white")
-    for ax, name in zip(axes, ("精馏段", "提馏段")):
-        VL, lk, en, fl, VL_lo, VL_hi, VLop, VVop = _load_perf_curves(d, name)
-        ax.plot(VL, lk, "b-", lw=1.5, label="漏液线")
-        ax.plot(VL, en, "r-", lw=1.5, label="雾沫夹带线")
-        ax.plot(VL, fl, "g-", lw=1.5, label="液泛线")
-        ax.axvline(VL_lo, color="m", ls="--", lw=1.2, label="液相下限")
-        ax.axvline(VL_hi, color="m", ls="--", lw=1.2, label="液相上限")
-        ax.plot([0, VLop * 1.6], [0, VVop * 1.6], "k-.", lw=1.0, label="操作线")
-        ax.plot([VLop], [VVop], "ko", ms=7, label="操作点")
-
-        up = min(float(np.interp(VLop, VL, en)), float(np.interp(VLop, VL, fl)))
-        down = float(np.interp(VLop, VL, lk))
-        ax.set_xlim(0, VL_hi * 1.35)
-        ax.set_ylim(0, max(np.nanmax(en), np.nanmax(fl)) * 1.1)
-        ax.set_xlabel("液相流量 L（m3/h）")
-        ax.set_ylabel("气相流量 V（m3/h）")
-        ax.set_title(f"{name} 塔板负荷性能图", fontsize=12)
-        ax.grid(True, ls=":", lw=0.5, alpha=0.6)
-        info = (f"操作点: L={VLop:.2f}, V={VVop:.1f}\n"
-                f"气相下限 {down:.1f}\n气相上限 {up:.1f}\n"
-                f"弹性 {up / down:.2f}" if down > 0 else "操作点附近无下限")
-        ax.text(0.02, 0.97, info, transform=ax.transAxes, fontsize=8,
-                va="top", bbox=dict(boxstyle="round", fc="white", ec="0.6"))
-        ax.legend(fontsize=7.5, loc="lower right", framealpha=0.9)
-
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=160, facecolor="white")
-    plt.close(fig)
-    return out_path
 
 
 def main(argv=None):
@@ -288,13 +258,11 @@ def main(argv=None):
     os.makedirs(outdir, exist_ok=True)
 
     p1 = os.path.join(outdir, f"理论板图_{args.id}.png")
-    p2 = os.path.join(outdir, f"负荷性能图_{args.id}.png")
     plot_mccabe(d, p1)
-    plot_loading(d, p2)
     print("已生成", p1)
-    print("已生成", p2)
     print(f"理论级数 {d['n_rect']+d['n_strip']}（精{d['n_rect']}+提{d['n_strip']}，含塔釜）、"
           f"理论板 N={d['N_trays']}、实际板 Ne={d['Ne']}（精{d['Ne_rect']}+提{d['Ne_strip']}）")
+    print("提示：塔板负荷性能图改用 Origin 出 —— python resources/design_origin.py --id <学号>")
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@
 
 - 一份完整的《设计说明书》（7 章，公式 + 数字都有）
 - 3 张 CAD 图（装配图 / 塔板布置图 / 工艺流程图）
-- 2 张附图（图解理论板图 / 塔板负荷性能图）
+- 2 张附图（图解理论板图 / 塔板负荷性能图，后者用 **Origin** 出）
 
 **你只需要：** 提供学号 → 回答几个参数选择 → 抄写说明书、打开图纸。
 
@@ -184,11 +184,11 @@ pip install numpy
 |---|---|---|
 | 算数（design_calc.py） | **啥也不用** | 任何 Python 都能跑 |
 | 出 CAD 图（design_draw.py） | ezdxf | 报 `No module named 'ezdxf'` |
-| 出附图（design_plot.py） | matplotlib、numpy | 报 `No module named 'matplotlib'` |
+| 出理论板图（design_plot.py） | matplotlib、numpy | 报 `No module named 'matplotlib'` |
 | DXF 转 PNG（preview.py） | ezdxf、matplotlib | 只能看 DXF 源文件 |
-| **Origin 版负荷性能图**（design_origin.py） | **Origin 软件 + originpro 包** | 不装也能用，只是出不了 Origin 版 |
+| **负荷性能图**（design_origin.py） | **Origin 软件 + originpro + pillow** | 出不了负荷性能图（这是唯一出处） |
 
-> ⚠️ `design_origin.py` 是**可选功能**，老师没要求用 Origin 就不用管它
+> ⚠️ 负荷性能图现在**只用 Origin 出**，所以 Origin 必须装（免费学习版申请见 5.7）
 
 ---
 
@@ -239,8 +239,9 @@ C:\Users\<你的用户名>\.dsh\.agent-presets\<你的预设名>\skills\chemeng-
     ├── flow_23044401.dxf
     ├── flow_23044401.png
     ├── 理论板图_23044401.png
-    ├── 负荷性能图_23044401.png
-    ├── 负荷性能图_Origin_23044401.png     ← Origin 版示例（可删）
+    ├── 负荷性能图_23044401.png            ← Origin 合成图（说明书用这张）
+    ├── 负荷性能图_精馏段_23044401.png
+    ├── 负荷性能图_提馏段_23044401.png
     ├── 负荷性能图_Origin_23044401.opju
     └── resources\
         ├── 模板原文_14429.txt              ← 默认底稿（7 章结构）
@@ -323,13 +324,13 @@ python resources\design_draw.py --id 23044401
 
 会在当前目录生成 3 个 DXF 文件（装配图/塔板布置图/工艺流程图）。
 
-### 5.5 出附图
+### 5.5 出理论板图
 
 ```
 python resources\design_plot.py --id 23044401
 ```
 
-会生成 2 个 PNG 文件（理论板图/负荷性能图）。
+会生成 **1 个 PNG**（图解理论板图）。塔板负荷性能图见 5.7。
 
 ### 5.6 把 DXF 转成图片看（不想开 AutoCAD 时）
 
@@ -345,15 +346,15 @@ python resources\preview.py assembly_23044401.dxf
 python resources\preview.py assembly_23044401.dxf --px 2400
 ```
 
-### 5.7 Origin 版负荷性能图（可选）
+### 5.7 塔板负荷性能图（Origin，必装）
 
-老师要求用 Origin 出图时才需要，**平时不用管**：
+负荷性能图**只用 Origin 出**（matplotlib 版已移除）：
 
 ```
 python resources\design_origin.py --id 23044401
 ```
 
-会生成 `负荷性能图_精馏段_<学号>.png`、`负荷性能图_提馏段_<学号>.png` 和一个 `.opju` Origin 工程文件。
+会生成 **4 个文件**：`负荷性能图_<学号>.png`（合成图，说明书用这张）、`负荷性能图_精馏段_<学号>.png`、`负荷性能图_提馏段_<学号>.png`、`负荷性能图_Origin_<学号>.opju`。
 
 #### 没装 Origin？免费申请「学习版」
 
@@ -402,7 +403,7 @@ Origin 是收费软件，但官方给学生提供 **OriginPro Learning Edition�
 pip install originpro
 ```
 
-> 不想注册 Origin 也完全没关系——`负荷性能图_<学号>.png`（matplotlib 版）已经够用了，Origin 版只是给了个更"科研风"的选择
+> 学习版免费、6 个月有效，学生都能申请，不用花钱
 
 ---
 
@@ -428,8 +429,8 @@ pip install originpro
 | 塔板平面布置图 | `tray_<学号>.dxf` | A3 图纸 |
 | 工艺流程图 | `flow_<学号>.dxf` | A2 图纸（7 台设备 + 设备一览表） |
 | 图解理论板图 | `理论板图_<学号>.png` | 贴进说明书 |
-| 塔板负荷性能图 | `负荷性能图_<学号>.png` | 贴进说明书 |
-| **Origin 版负荷性能图**（可选） | `负荷性能图_Origin_<学号>.png` + `.opju` | 老师要求 Origin 时用 |
+| 塔板负荷性能图 | `负荷性能图_<学号>.png`（Origin 合成） | 贴进说明书 |
+| Origin 工程 | `负荷性能图_Origin_<学号>.opju` | 想继续调图时用 Origin 打开 |
 
 ---
 
@@ -512,8 +513,8 @@ python resources\design_plot.py --id 23044401
 | `resources\课件要点_设计方法与校验标准.md` | 老师课件的方法与标准 | ❌ 不能删 |
 | `resources\design_calc.py` | 计算脚本（核心） | ❌ 不能删 |
 | `resources\design_draw.py` | 出 CAD 图脚本 | ❌ 不能删 |
-| `resources\design_plot.py` | 出附图脚本 | ❌ 不能删 |
-| `resources\design_origin.py` | Origin 版负荷性能图 | 可以删（不用 Origin 就删） |
+| `resources\design_plot.py` | 出理论板图脚本 | ❌ 不能删 |
+| `resources\design_origin.py` | 塔板负荷性能图（Origin，唯一出处） | ❌ 不能删 |
 | `resources\preview.py` | DXF 转 PNG | 可以删（不影响出图） |
 | `resources\ethanol-water-vle.csv` | 乙醇-水气液平衡数据 | ❌ 不能删 |
 | `assembly_*.dxf/png` 等 | 示例成品图 | 可以删 |
