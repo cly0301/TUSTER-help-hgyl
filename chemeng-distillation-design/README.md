@@ -185,6 +185,10 @@ pip install numpy
 | 算数（design_calc.py） | **啥也不用** | 任何 Python 都能跑 |
 | 出 CAD 图（design_draw.py） | ezdxf | 报 `No module named 'ezdxf'` |
 | 出附图（design_plot.py） | matplotlib、numpy | 报 `No module named 'matplotlib'` |
+| DXF 转 PNG（preview.py） | ezdxf、matplotlib | 只能看 DXF 源文件 |
+| **Origin 版负荷性能图**（design_origin.py） | **Origin 软件 + originpro 包** | 不装也能用，只是出不了 Origin 版 |
+
+> ⚠️ `design_origin.py` 是**可选功能**，老师没要求用 Origin 就不用管它
 
 ---
 
@@ -236,12 +240,16 @@ C:\Users\<你的用户名>\.dsh\.agent-presets\<你的预设名>\skills\chemeng-
     ├── flow_23044401.png
     ├── 理论板图_23044401.png
     ├── 负荷性能图_23044401.png
+    ├── 负荷性能图_Origin_23044401.png     ← Origin 版示例（可删）
+    ├── 负荷性能图_Origin_23044401.opju
     └── resources\
-        ├── 模板原文_14429.txt
+        ├── 模板原文_14429.txt              ← 默认底稿（7 章结构）
+        ├── 模板原文_天津科技大学2023.txt    ← 官方版（老师要求时用）
         ├── 课件要点_设计方法与校验标准.md
         ├── design_calc.py
         ├── design_draw.py
         ├── design_plot.py
+        ├── design_origin.py               ← Origin 版负荷性能图（可选）
         ├── preview.py
         └── ethanol-water-vle.csv
 ```
@@ -331,6 +339,25 @@ python resources\preview.py assembly_23044401.dxf
 
 会生成同名的 PNG，双击就能看。
 
+想要更清晰的图，加 `--px 2400`：
+
+```
+python resources\preview.py assembly_23044401.dxf --px 2400
+```
+
+### 5.7 Origin 版负荷性能图（可选）
+
+老师要求用 Origin 出图时才需要，**平时不用管**：
+
+```
+python resources\design_origin.py --id 23044401
+```
+
+会生成 `负荷性能图_精馏段_<学号>.png`、`负荷性能图_提馏段_<学号>.png` 和一个 `.opju` Origin 工程文件。
+
+> 前提：电脑装了 Origin，且 Python 装了 `originpro` 包
+> 教育版 Origin 同时只能开 10 张表，脚本已按「每段 1 张表」设计
+
 ---
 
 ## 6. 三种学号输入方式（任选一种）
@@ -351,11 +378,12 @@ python resources\preview.py assembly_23044401.dxf
 | 产物 | 文件 | 用途 |
 |---|---|---|
 | 设计说明书 | `设计说明书_<学号>.md` | 照着抄到作业本（手写） |
-| 塔设备装配图 | `assembly_<学号>.dxf` | A1 图纸，AutoCAD 打印 |
+| 塔设备装配图 | `assembly_<学号>.dxf` | A1 图纸，AutoCAD 打印（43 项明细 / 11 个管口 / 6 个详图） |
 | 塔板平面布置图 | `tray_<学号>.dxf` | A3 图纸 |
-| 工艺流程图 | `flow_<学号>.dxf` | A2 图纸 |
+| 工艺流程图 | `flow_<学号>.dxf` | A2 图纸（7 台设备 + 设备一览表） |
 | 图解理论板图 | `理论板图_<学号>.png` | 贴进说明书 |
 | 塔板负荷性能图 | `负荷性能图_<学号>.png` | 贴进说明书 |
+| **Origin 版负荷性能图**（可选） | `负荷性能图_Origin_<学号>.png` + `.opju` | 老师要求 Origin 时用 |
 
 ---
 
@@ -433,11 +461,13 @@ python resources\design_plot.py --id 23044401
 | `requirements.txt` | 依赖包清单 | ❌ 不能删（装依赖要用） |
 | `14429 设计说明书107.pdf` | 说明书模板原件 | ❌ 不能删 |
 | `设计说明书_23044401.md` | 示例说明书 | 建议留着 |
-| `resources\模板原文_14429.txt` | 模板的纯文字版 | ❌ 不能删 |
+| `resources\模板原文_14429.txt` | 模板纯文字版（**默认底稿**，7 章结构） | ❌ 不能删 |
+| `resources\模板原文_天津科技大学2023.txt` | 官方 2023 版模板全文（老师要求时用） | 建议留着 |
 | `resources\课件要点_设计方法与校验标准.md` | 老师课件的方法与标准 | ❌ 不能删 |
 | `resources\design_calc.py` | 计算脚本（核心） | ❌ 不能删 |
 | `resources\design_draw.py` | 出 CAD 图脚本 | ❌ 不能删 |
 | `resources\design_plot.py` | 出附图脚本 | ❌ 不能删 |
+| `resources\design_origin.py` | Origin 版负荷性能图 | 可以删（不用 Origin 就删） |
 | `resources\preview.py` | DXF 转 PNG | 可以删（不影响出图） |
 | `resources\ethanol-water-vle.csv` | 乙醇-水气液平衡数据 | ❌ 不能删 |
 | `assembly_*.dxf/png` 等 | 示例成品图 | 可以删 |
