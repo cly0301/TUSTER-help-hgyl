@@ -4,6 +4,25 @@
 
 ---
 
+## ⚡ 最快装法：把仓库地址发给你的 DSH
+
+**你不需要看懂下面任何内容**，只要做一件事：
+
+打开你的 DeepSeek Harness，新建会话，发这句话：
+
+```
+帮我把 https://github.com/cly0301/TUSTER-help-hgyl 这个 skill 装上
+```
+
+DSH 会自己读仓库里的 `INSTALL.md`，把 skill 装到 `~/.dsh/skills/`、把预设包装好，然后告诉你「装好了」。
+
+装完刷新页面（F5），预设选择器里就会出现「**化工原理课设助手**」。
+
+> 给 AI 看的完整安装步骤在仓库根的 **`INSTALL.md`**
+> 想手动装 / 想搞懂原理，继续往下读第 2、3 节
+
+---
+
 ## 0. 这到底是干什么的？（30 秒看懂）
 
 你有一份**化工原理课程设计**作业：设计一座「乙醇-水筛板精馏塔」。
@@ -245,78 +264,95 @@ pip install originpro pillow
 
 ---
 
-## 3. 把 skill 装进 DSH
+## 3. 把 skill 装进 DSH（手动版）
 
-### 3.1 下载 skill
+> ⚡ 最快的办法其实是把仓库地址丢给 DSH 让它自己装（见本文最上面）。
+> 下面是手动步骤，给想自己控制 / 排查问题的人看。
 
-1. 打开浏览器，访问：
-   **https://github.com/cly0301/TUSTER-help-hgyl**
-2. 点绿色的 **Code** 按钮 → 选 **Download ZIP**
-3. 下载完成后，右键压缩包 → **全部解压**
-4. 解压后你会看到一个文件夹，名字类似 `TUSTER-help-hgyl-main`
+### 3.0 先看你的 DSH 是哪个版本
 
-### 3.2 找到「预设目录」
-
-1. 按 `Win + R`，输入下面这行，回车：
-
-   ```
-   %USERPROFILE%\.dsh\.agent-presets
-   ```
-
-2. 这会打开一个文件夹。
-   - **如果提示「找不到文件」**：说明 `.agent-presets` 文件夹还不存在，需要手动建：
-     在文件资源管理器地址栏输入 `%USERPROFILE%\.dsh`，回车，右键 → 新建 → 文件夹，命名为 `.agent-presets`（注意前面有个点）。
-
-### 3.3 放进 skills 文件夹
-
-1. 在 `.agent-presets` 里，找到你的预设文件夹（比如 `chemeng`）。
-   - 没有的话，就复制一个现成的预设文件夹改个名，或者直接新建一个。
-2. 进入这个预设文件夹，找到 `skills` 文件夹（没有就新建）。
-3. 把解压出来的 **`chemeng-distillation-design` 整个文件夹**，复制到 `skills` 里面。
-
-### 3.4 检查目录结构
-
-放好之后，路径应该长这样：
+按 `Win + R` 输入下面这行，回车：
 
 ```
-C:\Users\<你的用户名>\.dsh\.agent-presets\<你的预设名>\skills\chemeng-distillation-design\
+%LOCALAPPDATA%\Programs\DeepSeek Harness
+```
+
+看文件夹里 `DeepSeek Harness.exe` 的版本（右键 → 属性 → 详细信息）：
+
+| 版本 | 装法 |
+|---|---|
+| **0.2.x 及以上** | 第 3.1 步 + 第 3.2 步（**两个都要做**） |
+| **0.1.x** | 只做第 3.1 步 |
+
+> 为什么要分区：0.1.x 用 `~/.dsh/.agent-presets/` 目录放预设，0.2.x 改成「插件包」机制了
+
+### 3.1 装 skill 到全局 skill 目录
+
+1. 按 `Win + R`，输入下面这行回车，打开 DSH 主目录：
+
+   ```
+   %USERPROFILE%\.dsh
+   ```
+
+2. 没有 `skills` 文件夹就新建一个
+3. 把仓库里的 **`chemeng-distillation-design` 整个文件夹**复制进 `skills`
+
+放好后应该是：
+
+```
+C:\Users\<用户名>\.dsh\skills\chemeng-distillation-design\
     ├── SKILL.md
     ├── README.md
+    ├── INSTALL.md
     ├── requirements.txt
-    ├── 14429 设计说明书107.pdf
-    ├── 设计说明书_23044401.md
-    ├── assembly_23044401.dxf        ← 示例图（可删）
-    ├── assembly_23044401.png
-    ├── tray_23044401.dxf
-    ├── tray_23044401.png
-    ├── flow_23044401.dxf
-    ├── flow_23044401.png
-    ├── 理论板图_23044401.png
-    ├── 负荷性能图_23044401.png            ← Origin 合成图（说明书用这张）
-    ├── 负荷性能图_精馏段_23044401.png
-    ├── 负荷性能图_提馏段_23044401.png
-    ├── 负荷性能图_Origin_23044401.opju
     └── resources\
-        ├── 模板原文_14429.txt              ← 默认底稿（7 章结构）
-        ├── 模板原文_天津科技大学2023.txt    ← 官方版（老师要求时用）
-        ├── 课件要点_设计方法与校验标准.md
         ├── design_calc.py
         ├── design_draw.py
         ├── design_plot.py
-        ├── design_origin.py               ← Origin 版负荷性能图（可选）
+        ├── design_origin.py
         ├── preview.py
-        └── ethanol-water-vle.csv
+        ├── ethanol-water-vle.csv
+        ├── 模板原文_14429.txt
+        ├── 模板原文_天津科技大学2023.txt
+        └── 课件要点_设计方法与校验标准.md
 ```
 
-> ⚠️ **必须复制整个文件夹！**
-> 只复制 `SKILL.md` 一个文件是不行的——计算脚本、模板、平衡数据都在 `resources\` 里，
-> 少一个就跑不起来。
+> 这一步做完，**任意会话**里说「做化工原理课设」就能触发 skill 了
 
-### 3.5 重启 DSH
+### 3.2 装预设「化工原理课设助手」（0.2.x 才需要）
 
-关掉 DSH，重新打开。
+1. 把仓库里的 **`chemeng-preset` 文件夹**复制到：
 
----
+   ```
+   C:\Users\<用户名>\.dsh\chemeng-preset
+   ```
+
+2. 在 DSH 对话框里发这句话：
+
+   ```
+   请执行 plugin_manager(action="install_bundle", target="C:\\Users\\<你的用户名>\\.dsh\\chemeng-preset")
+   ```
+
+   （把 `<你的用户名>` 换成你的实际用户名）
+
+3. DSH 会返回 `"application": "applied"`，就装好了
+
+> ⚠️ 不要自己改 `profiles\desktop\package.json`——那是 `plugin_manager` 的活
+
+### 3.3 刷新页面
+
+按 **F5** 刷新 DSH 页面，新建会话时预设选择器里就会出现「**化工原理课设助手**」
+
+如果显示「加载失败」，把报错文字发给 DSH，让它按 `INSTALL.md` 第 4 节排查
+
+### 3.4 装 Python 依赖（出图要用）
+
+```
+pip install ezdxf matplotlib numpy
+```
+
+Origin 版负荷性能图还要 `pip install originpro pillow`（Origin 本体的免费申请见 2.5 节）
+
 
 ## 4. 怎么用（在 DSH 里，最省事）
 
@@ -513,6 +549,7 @@ python resources\design_plot.py --id 23044401
 |---|---|---|
 | `SKILL.md` | 给 AI 看的「操作手册」 | ❌ 不能删 |
 | `README.md` | 就是本说明 | 可以（但建议留着） |
+| `INSTALL.md` | **给 AI 看的安装说明**（把仓库地址发给 DSH 时它照着做） | 建议留着 |
 | `requirements.txt` | 依赖包清单 | ❌ 不能删（装依赖要用） |
 | `14429 设计说明书107.pdf` | 说明书模板原件 | ❌ 不能删 |
 | `设计说明书_23044401.md` | 示例说明书 | 建议留着 |
