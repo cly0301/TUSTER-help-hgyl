@@ -21,7 +21,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
-import originpro as op
+
+try:
+    import originpro as op
+    HAS_ORIGIN = True
+except Exception:                                    # 没装 originpro / Origin 起不来
+    op = None
+    HAS_ORIGIN = False
 
 import design_plot as dp
 
@@ -169,10 +175,56 @@ def build_graph(sec, wks, outdir, xuehao):
     return png
 
 
+def plot_mpl_fallback(sec, outdir, xuehao):
+    """Origin 不可用时的 matplotlib 兜底：样式与 Origin 版一致。
+
+    只在 originpro 缺失 / Origin 启动失败时使用，保证「没有 Origin 也能出图」。
+    """
+    dp._setup_matplotlib()
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(7, 5.6), facecolor="white")
+    xs = [sec["x_lo"], sec["x_hi"]]
+    ax.plot(xs, sec["leak"], "-s", color="black", ms=7, lw=1.2, label="漏液线")
+    ax.plot(xs, sec["flood"], "-o", color="red", ms=7, lw=1.2, label="液泛线")
+    ax.plot(xs, sec["entrain"], "-^", color="blue", ms=7, lw=1.2, label="雾沫夹带上限线")
+    ax.plot([sec["x_lo"]] * 2, [0, sec["ymax"]], "-v", color="green", ms=7, lw=1.2,
+            label="液相流率下限")
+    ax.plot([sec["x_hi"]] * 2, [0, sec["ymax"]], "-D", color="magenta", ms=7, lw=1.2,
+            label="液相流率上限")
+    ax.plot([0, sec["VLop"] * 1.6], [0, sec["Vop"] * 1.6], "k-", lw=1.0, label="操作线")
+    ax.plot([sec["VLop"]], [sec["Vop"]], "P", color="orange", ms=10, label="操作点")
+
+    ax.set_xlim(0, sec["x_hi"] * 1.5)
+    ax.set_ylim(0, sec["ymax"])
+    ax.set_xlabel("V_L (m3/s)")
+    ax.set_ylabel("V_G (m3/s)")
+    ax.set_title(f"{sec['name']} 气体液体负荷性能图", fontsize=12)
+    ax.grid(True, ls=":", lw=0.5, alpha=0.5)
+
+    ax.annotate(f"V_Gmax={sec['Vmax']:.3f} m3/s", (sec["x_hi"] * 0.30, sec["Vmax"] * 1.10))
+    ax.annotate(f"V_Gmin={sec['Vmin']:.3f} m3/s", (sec["x_hi"] * 0.12, sec["Vmin"] * 0.70))
+    ax.annotate(f"( {sec['VLop']:.6f} , {sec['Vop']:.3f} )",
+                (sec["VLop"] * 1.25, sec["Vop"] * 1.12))
+    ax.annotate(f"操作弹性: V_Gmax/V_Gmin = {sec['Vmax'] / sec['Vmin']:.2f}",
+                (sec["x_hi"] * 0.50, sec["ymax"] * 0.38))
+    ax.annotate(f"稳定系数: V_G/V_Gmin = {sec['Vop'] / sec['Vmin']:.2f}",
+                (sec["x_hi"] * 0.50, sec["ymax"] * 0.28))
+    ax.legend(fontsize=8, loc="upper right", framealpha=0.95)
+
+    out = os.path.join(outdir, f"负荷性能图_{sec['name']}_{xuehao}.png")
+    fig.tight_layout()
+    fig.savefig(out, dpi=160, facecolor="white")
+    plt.close(fig)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--id", required=True, help="学号")
     ap.add_argument("--out", default=None, help="输出目录（默认当前目录）")
+    ap.add_argument("--force-mpl", action="store_true",
+                    help="强制用 matplotlib 兜底（不用 Origin）")
     args = ap.parse_args()
 
     d = dp.get_json(args.id)
@@ -180,22 +232,31 @@ def main():
     outdir = os.path.abspath(args.out or os.getcwd())
     os.makedirs(outdir, exist_ok=True)
 
-    try:
-        op.new()
-    except Exception:
-        pass
+    secs = [get_section(d, name) for name in ("精馏段", "提馏段")]
 
-    pngs = []
-    for name in ("精馏段", "提馏段"):
-        sec = get_section(d, name)
-        wks = make_sheet(sec)
-        pngs.append(build_graph(sec, wks, outdir, args.id))
+    use_origin = HAS_ORIGIN and not args.force_mpl
+    if use_origin:
+        try:
+            op.new()
+        except Exception as e:
+            print("Origin 启动失败，改用 matplotlib 兜底：", e)
+            use_origin = False
 
-    opju = os.path.join(outdir, f"负荷性能图_Origin_{args.id}.opju")
-    try:
-        op.save(opju)
-    except Exception:
-        pass
+    if use_origin:
+        pngs = []
+        for sec in secs:
+            wks = make_sheet(sec)
+            pngs.append(build_graph(sec, wks, outdir, args.id))
+        opju = os.path.join(outdir, f"负荷性能图_Origin_{args.id}.opju")
+        try:
+            op.save(opju)
+        except Exception:
+            pass
+    else:
+        if not HAS_ORIGIN:
+            print("未检测到 originpro / Origin，改用 matplotlib 版（样式相同）")
+        pngs = [plot_mpl_fallback(sec, outdir, args.id) for sec in secs]
+        opju = None
 
     # 并排合成一张标准图（装订进说明书用这个）
     combined = None
@@ -218,7 +279,8 @@ def main():
         print("已导出", p)
     if combined:
         print("已合成", combined)
-    print("已保存工程", opju)
+    if opju:
+        print("已保存工程", opju)
 
 
 if __name__ == "__main__":

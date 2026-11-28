@@ -377,8 +377,13 @@ python resources/design_origin.py --id <学号>
 
 **样式按参考图「气体液相负荷性能图」**：横轴 `V_L (m3/s)`、纵轴 `V_G (m3/s)`；五条线各带标记——漏液线■黑、液泛线●红、雾沫夹带上限线▲蓝、液相流率下限▼绿、液相流率上限◆品红；操作点用十字标记并标坐标；图上标注 `V_Gmax`、`V_Gmin`、`操作弹性`、`稳定系数`。
 
-> **依赖**：Origin（免费学习版申请见 README 5.7）+ `originpro` + `pillow` 包，用 DSH Origin 插件的 venv 跑：
-> `C:\Users\<用户名>\dsh_origin_plugin\.venv\Scripts\python.exe resources\design_origin.py --id <学号>`
+> **依赖**（按优先级自动降级，不会因为缺东西直接失败）：
+> 1. **有 Origin + originpro** → 用 Origin 出，附带 .opju 工程
+> 2. **没有 Origin / originpro** → 自动改用 matplotlib 兜底，样式一致，只是没有 .opju
+> 3. 想强制走 matplotlib：加 --force-mpl
+>
+> **用哪个 Python**：要用**装了 originpro 的那个**。不确定就先跑 python -c "import originpro"，能过就是它；
+> 或者加 --force-mpl 用普通 Python（只需 matplotlib + pillow）。
 >
 > **教育版注意**：Origin 学习版每个工程最多 12 个窗口，脚本已按「每段 1 张表、共 2 张」设计；跑之前建议先关掉 Origin 里其他工程。
 >

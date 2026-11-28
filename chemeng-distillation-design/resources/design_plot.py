@@ -25,20 +25,50 @@ CALC = os.path.join(BASE, "design_calc.py")
 VLE = os.path.join(BASE, "ethanol-water-vle.csv")
 
 
+def _cjk_fonts():
+    """动态找系统里的中文字体，不写死 C 盘路径。
+
+    Windows 找 %WINDIR%\\Fonts，Linux 找 /usr/share/fonts，macOS 找 /System/Library/Fonts。
+    返回已注册的字体文件路径列表（可能为空，此时靠 matplotlib 自带字体兜底）。
+    """
+    import glob
+    from matplotlib import font_manager
+
+    keywords = ("simhei", "simfang", "simsun", "msyh", "simkai",
+                "notosanscjk", "sourcehansans", "wqy", "arphic", "uming", "ukai")
+    dirs = [
+        os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"),
+        os.path.expanduser("~/.fonts"),
+        "/usr/share/fonts",
+        "/usr/local/share/fonts",
+        "/System/Library/Fonts",
+        "/Library/Fonts",
+    ]
+    found = []
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for pat in ("**/*.ttf", "**/*.ttc", "**/*.otf"):
+            for fp in glob.glob(os.path.join(d, pat), recursive=True):
+                low = os.path.basename(fp).lower()
+                if any(k in low for k in keywords):
+                    found.append(fp)
+    for fp in found[:6]:
+        try:
+            font_manager.fontManager.addfont(fp)
+        except Exception:
+            pass
+    return found
+
+
 def _setup_matplotlib():
     import matplotlib
     matplotlib.use("Agg")
-    from matplotlib import font_manager
-    for fp in ("C:/Windows/Fonts/simfang.ttf", "C:/Windows/Fonts/simhei.ttf",
-               "C:/Windows/Fonts/simsun.ttc", "C:/Windows/Fonts/msyh.ttc"):
-        if os.path.exists(fp):
-            try:
-                font_manager.fontManager.addfont(fp)
-            except Exception:
-                pass
+    _cjk_fonts()
     matplotlib.rcParams["font.family"] = "sans-serif"
     matplotlib.rcParams["font.sans-serif"] = [
-        "SimFang", "SimHei", "SimSun", "Microsoft YaHei", "DejaVu Sans"]
+        "SimHei", "SimFang", "SimSun", "Microsoft YaHei", "Noto Sans CJK SC",
+        "WenQuanYi Zen Hei", "DejaVu Sans"]
     matplotlib.rcParams["axes.unicode_minus"] = False
     return matplotlib
 

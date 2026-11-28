@@ -437,7 +437,7 @@ python resources\preview.py assembly_23044401.dxf --px 2400
 
 ### 5.7 塔板负荷性能图（Origin，必装）
 
-负荷性能图**只用 Origin 出**（matplotlib 版已移除）：
+负荷性能图**优先用 Origin 出**；没装 Origin 会自动降级成 matplotlib（样式一致）：
 
 ```
 python resources\design_origin.py --id 23044401
@@ -445,7 +445,8 @@ python resources\design_origin.py --id 23044401
 
 会生成 **4 个文件**：`负荷性能图_<学号>.png`（合成图，说明书用这张）、`负荷性能图_精馏段_<学号>.png`、`负荷性能图_提馏段_<学号>.png`、`负荷性能图_Origin_<学号>.opju`。
 
-> **没装 Origin？** 免费学习版的申请步骤见 **2.5 节**（6 个月有效，需学校邮箱）
+> **没装 Origin？** 免费学习版的申请步骤见 **2.5 节**（6 个月有效，需学校邮箱）。
+> 不想装也能用：脚本检测不到 Origin 会自动走 matplotlib 版
 >
 > 装完 Origin 还要装 Python 包：`pip install originpro pillow`
 
